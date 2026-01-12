@@ -62,5 +62,7 @@ CFLAGS_vmx/pkvm_host.o    := -iquote $(obj)
 
 obj-$(CONFIG_PKVM_X86) += pkvm-intel.o pkvm.o pkvm_debugfs.o pkvm/
 
+obj-$(CONFIG_PKVM_X86_KUNIT_TEST) += pkvm_test.o
+
 targets += kvm-asm-offsets.s pkvm-constants.s
 clean-files += kvm-asm-offsets.h pkvm_constants.h
