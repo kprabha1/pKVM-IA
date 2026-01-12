@@ -168,9 +168,23 @@ config PKVM_X86_DEBUG
 
 	  If unsure, say N.
 
+config PKVM_X86_HYP_TEST
+	bool "pKVM x86 hypervisor test support"
+	depends on PKVM_X86
+
+	help
+	  Provides pKVM x86 hypervisor test support. This option enables
+	  compilation of the hypervisor-side test code, which exposes
+	  hypercalls for the host to trigger various self-tests and
+	  introspection mechanisms. This is required for running the
+	  pKVM KUnit tests.
+
+	  If unsure, say N.
+
 config PKVM_X86_KUNIT_TEST
 	tristate "pKVM x86 kunit test utilities"
 	depends on KUNIT
+	depends on PKVM_X86_HYP_TEST
 
 	help
 	  Provides pKVM x86 host KUnit test utilities. This module contains

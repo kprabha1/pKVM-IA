@@ -106,6 +106,9 @@ PKVM_HC_INOUT(iommu_domain_map)
 PKVM_HC(iommu_domain_unmap)
 #endif
 
+/* pKVM Test support */
+PKVM_HC(test)
+
 #undef PKVM_HC
 #undef PKVM_HC_OUT
 #undef PKVM_HC_IN

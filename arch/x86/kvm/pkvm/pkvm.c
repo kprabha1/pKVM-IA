@@ -10,6 +10,7 @@
 #include "memory.h"
 #include "mmu.h"
 #include "pkvm.h"
+#include "pkvm_test.h"
 #include "trace.h"
 #include "../x86.h"
 #include "../lapic.h"
@@ -2087,6 +2088,9 @@ void pkvm_handle_host_hypercall(struct kvm_vcpu *vcpu)
 					      pkvm_hc_input3(vcpu));
 		break;
 #endif
+	case __pkvm__test:
+		ret = pkvm_test(vcpu, &in, &out);
+		break;
 	default:
 		ret = pkvm_vcpu_handle_host_hypercall(vcpu, hc, &in, &out);
 		break;

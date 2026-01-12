@@ -18,6 +18,10 @@ pkvm-hyp-y			:= early_alloc.o pkvm.o memory.o cpu.o \
 pkvm-lib			:= lib
 pkvm-hyp-y			+= $(pkvm-lib)/find_bit.o
 
+ifdef CONFIG_PKVM_X86_HYP_TEST
+pkvm-hyp-y			+= pkvm_test.o
+endif
+
 kernel-x86-lib			:= ../../lib
 pkvm-hyp-y			+= $(kernel-x86-lib)/memset_64.o
 pkvm-hyp-y			+= $(kernel-x86-lib)/memcpy_64.o
