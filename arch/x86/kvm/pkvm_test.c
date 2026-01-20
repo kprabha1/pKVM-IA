@@ -91,7 +91,53 @@ static struct kunit_suite pkvm_nmi = {
 	.test_cases = pkvm_nmi_test_cases,
 };
 
-kunit_test_suites(&pkvm_nmi);
+static void pkvm_supported_msr_test(struct kunit *test)
+{
+	union cpuid10_eax eax = {
+		.full = native_cpuid_eax(10),
+	};
+	u64 val;
+
+	if (eax.split.version_id > 1) {
+		KUNIT_ASSERT_EQ_MSG(test, rdmsrq_safe(MSR_CORE_PERF_GLOBAL_CTRL, &val), 0,
+				"pkvm-msr: read MSR_CORE_PERF_GLOBAL_CTRL failed\n");
+		KUNIT_ASSERT_EQ_MSG(test, wrmsrq_safe(MSR_CORE_PERF_GLOBAL_CTRL, val), 0,
+				"pkvm-msr: write MSR_CORE_PERF_GLOBAL_CTRL failed\n");
+	} else {
+		KUNIT_ASSERT_NE_MSG(test, rdmsrq_safe(MSR_CORE_PERF_GLOBAL_CTRL, &val), 0,
+				"pkvm-msr: expect MSR_CORE_PERF_GLOBAL_CTRL unsupported\n");
+	}
+
+	KUNIT_ASSERT_EQ_MSG(test, rdmsrq_safe(MSR_IA32_APICBASE, &val), 0,
+		"pkvm-msr: read MSR_IA32_APICBASE failed\n");
+	KUNIT_ASSERT_EQ_MSG(test, wrmsrq_safe(MSR_IA32_APICBASE, val), 0,
+		"pkvm-msr: write MSR_IA32_APICBASE failed\n");
+}
+
+static void pkvm_unconditional_trapped_msr_test(struct kunit *test)
+{
+	u32 msr = 0xC0002000;
+	u64 val;
+
+	KUNIT_ASSERT_NE_MSG(test, rdmsrq_safe(msr, &val), 0,
+		"pkvm-msr: Expect failure to read unconditional trapped MSR 0x%x\n", msr);
+
+	KUNIT_ASSERT_NE_MSG(test, wrmsrq_safe(msr, val), 0,
+		"pkvm-msr: Expect failure to write unconditional trapped MSR 0x%x\n", msr);
+}
+
+static struct kunit_case pkvm_msr_test_cases[] = {
+	KUNIT_CASE(pkvm_supported_msr_test),
+	KUNIT_CASE(pkvm_unconditional_trapped_msr_test),
+	{}
+};
+
+static struct kunit_suite pkvm_msr = {
+	.name = "pkvm_msr",
+	.test_cases = pkvm_msr_test_cases,
+};
+
+kunit_test_suites(&pkvm_nmi, &pkvm_msr);
 
 static int __init pkvm_kunit_test_init(void)
 {
