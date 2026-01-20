@@ -335,6 +335,20 @@ void pkvm_host_vmexit_main(struct vcpu_vmx *vmx)
 		handle_vmcall(vcpu);
 		skip_instruction = true;
 		break;
+	case EXIT_REASON_VMCLEAR:
+	case EXIT_REASON_VMLAUNCH:
+	case EXIT_REASON_VMPTRLD:
+	case EXIT_REASON_VMPTRST:
+	case EXIT_REASON_VMREAD:
+	case EXIT_REASON_VMRESUME:
+	case EXIT_REASON_VMWRITE:
+	case EXIT_REASON_VMOFF:
+	case EXIT_REASON_VMON:
+	case EXIT_REASON_INVEPT:
+	case EXIT_REASON_INVVPID:
+	case EXIT_REASON_VMFUNC:
+		kvm_handle_invalid_op(vcpu);
+		break;
 	case EXIT_REASON_CR_ACCESS:
 		handle_cr(vcpu);
 		skip_instruction = true;
