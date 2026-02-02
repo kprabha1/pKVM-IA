@@ -403,7 +403,7 @@ int pkvm_handle_host_ept_violation(void)
 	 */
 	if (pkvm_find_addr_range(gpa, &range) || is_pvmfw(gpa) ||
 	    is_iommu_mmio(gpa)) {
-		pkvm_err("Host access to protected memory at 0x%lx\n", gpa);
+		pkvm_err_ratelimited("Host access to protected memory at 0x%lx\n", gpa);
 		return ret;
 	}
 
