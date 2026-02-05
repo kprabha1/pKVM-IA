@@ -21,6 +21,11 @@ bool pvmfw_present;
 phys_addr_t pvmfw_base;
 phys_addr_t pvmfw_size;
 
+#if IS_MODULE(CONFIG_PKVM_X86_KUNIT_TEST)
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(text_start));
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(text_end));
+#endif /* IS_MODULE(CONFIG_PKVM_X86_KUNIT_TEST) */
+
 static int cmp_pkvm_memblock(const void *p1, const void *p2)
 {
 	const struct memblock_region *r1 = p1;

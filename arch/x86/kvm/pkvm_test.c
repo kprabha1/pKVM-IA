@@ -177,7 +177,50 @@ static struct kunit_suite pkvm_lapic = {
 	.test_cases = pkvm_lapic_test_cases,
 };
 
-kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic);
+static void do_pkvm_hyp_init(void *data)
+{
+	struct pkvm_mem_info infos[] = {
+		{
+			.type	= PKVM_TEXT_DATA,
+			.va	= (unsigned long)pkvm_sym(text_start),
+			.pa	= __pa_symbol(pkvm_sym(text_start)),
+			.size	= pkvm_sym(text_end) - pkvm_sym(text_start),
+			.prot	= pgprot_val(PAGE_KERNEL_EXEC),
+		},
+	};
+	int ret = pkvm_hypercall(init, (unsigned long)infos, ARRAY_SIZE(infos));
+
+	if (data)
+		*(int *)data = ret;
+}
+
+static void pkvm_init_finalize_test(struct kunit *test)
+{
+	int init_ret, cpu;
+
+	for_each_possible_cpu(cpu) {
+		KUNIT_ASSERT_EQ_MSG(test, smp_call_function_single(cpu, do_pkvm_hyp_init,
+								   &init_ret, 1), 0,
+				    "pkvm-init-finalize: CPU%d smp-call failed\n", cpu);
+		KUNIT_ASSERT_NE_MSG(test, init_ret, 0,
+				    "pkvm-init-finalize: expect init failure on CPU %d\n", cpu);
+	}
+
+	KUNIT_ASSERT_NE_MSG(test, pkvm_hypercall(init_finalize), 0,
+			    "pkvm-init-finalize: expect init_finalize failure\n");
+}
+
+static struct kunit_case pkvm_init_finalize_test_cases[] = {
+	KUNIT_CASE(pkvm_init_finalize_test),
+	{}
+};
+
+static struct kunit_suite pkvm_init_finalize = {
+	.name = "pkvm_init_finalize",
+	.test_cases = pkvm_init_finalize_test_cases,
+};
+
+kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize);
 
 static int __init pkvm_kunit_test_init(void)
 {

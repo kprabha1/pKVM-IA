@@ -2180,6 +2180,14 @@ static inline bool pkvm_enabled(void)
 {
 	return static_branch_likely(&pkvm_enabled_key);
 }
+
+#if IS_MODULE(CONFIG_PKVM_X86_KUNIT_TEST)
+#define EXPORT_SYMBOL_FOR_PKVM_INTERNAL(symbol) \
+	EXPORT_SYMBOL_FOR_MODULES(symbol, __stringify(pkvm_test))
+#else
+#define EXPORT_SYMBOL_FOR_PKVM_INTERNAL(symbol)
+#endif
+
 #else
 #define enable_pkvm		false
 static inline bool pkvm_enabled(void) { return false; }
