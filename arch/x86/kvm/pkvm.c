@@ -26,6 +26,14 @@ EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_mem_base);
 EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_mem_size);
 EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(text_start));
 EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(text_end));
+#ifndef CONFIG_PKVM_X86_DEBUG
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(rodata_start));
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(rodata_end));
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(data_start));
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(data_end));
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(bss_start));
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(bss_end));
+#endif /* !CONFIG_PKVM_X86_DEBUG */
 #endif /* IS_MODULE(CONFIG_PKVM_X86_KUNIT_TEST) */
 
 static int cmp_pkvm_memblock(const void *p1, const void *p2)

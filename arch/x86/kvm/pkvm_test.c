@@ -552,9 +552,68 @@ static struct kunit_suite pkvm_spec = {
 	.test_cases = pkvm_spec_test_cases,
 };
 
+static void pkvm_mem_test(struct kunit *test)
+{
+	struct pkvm_mem_info infos[] = {
+		{
+			.pa	= pkvm_mem_base,
+			.size	= pkvm_mem_size,
+		},
+#ifndef CONFIG_PKVM_X86_DEBUG
+		{
+			.pa	= __pa_symbol(pkvm_sym(text_start)),
+			.size	= pkvm_sym(text_end) - pkvm_sym(text_start),
+		},
+		{
+			.pa	= __pa_symbol(pkvm_sym(rodata_start)),
+		},
+		{
+			.pa	= __pa_symbol(pkvm_sym(data_start)),
+			.size	= pkvm_sym(data_end) - pkvm_sym(data_start),
+		},
+		{
+			.pa	= __pa_symbol(pkvm_sym(bss_start)),
+			.size	= pkvm_sym(bss_end) - pkvm_sym(bss_start),
+		},
+#endif
+	};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(infos); i++) {
+		void *end = __va(PAGE_ALIGN(infos[i].pa + infos[i].size));
+		void *start = __va(PAGE_ALIGN_DOWN(infos[i].pa));
+
+		while (start < end) {
+			u64 value;
+
+			asm goto("1: movq (%1), %0\n\t"
+				 _ASM_EXTABLE(1b, %l[do_exception])
+				 : "=r" (value)
+				 : "r" (start)
+				 : "memory"
+				 : do_exception);
+
+			KUNIT_FAIL(test, "pkvm_mem: test failed\n");
+			return;
+do_exception:
+			start += PAGE_SIZE;
+		}
+	}
+}
+
+static struct kunit_case pkvm_mem_test_cases[] = {
+	KUNIT_CASE(pkvm_mem_test),
+	{}
+};
+
+static struct kunit_suite pkvm_mem = {
+	.name = "pkvm_mem",
+	.test_cases = pkvm_mem_test_cases,
+};
+
 kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize,
 		  &pkvm_reprivilege, &pkvm_fix_exception, &pkvm_hyp_mmu,
-		  &pkvm_vmx, &pkvm_spec);
+		  &pkvm_vmx, &pkvm_spec, &pkvm_mem);
 
 static int __init pkvm_kunit_test_init(void)
 {
