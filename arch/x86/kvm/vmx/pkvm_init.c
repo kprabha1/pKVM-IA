@@ -10,6 +10,10 @@
 #include "vmx.h"
 #include "pkvm_iommu.h"
 
+#ifdef CONFIG_PKVM_X86_HYP_TEST
+#include <linux/delay.h>
+#endif
+
 extern u64 x86_pred_cmd;
 
 static int __init early_pkvm_parse_cmdline(char *buf)
@@ -129,6 +133,9 @@ static __init void pkvm_setup_syms(void)
 	pkvm_sym(enable_apicv) = enable_apicv;
 	pkvm_sym(enable_ipiv) = enable_ipiv;
 	pkvm_sym(enable_vpid) = enable_vpid;
+#ifdef CONFIG_PKVM_X86_HYP_TEST
+	pkvm_sym(loops_per_jiffy) = loops_per_jiffy;
+#endif
 }
 
 static __init int pkvm_setup_host_vmcs_config(void)

@@ -870,6 +870,16 @@ static inline size_t pkvm_guest_initial_fpstate_size(struct kvm *kvm)
 
 #endif /* __PKVM_HYP__ */
 
+#ifdef CONFIG_PKVM_X86_HYP_TEST
+
+enum pkvm_test_fn {
+	NMI_BUSY_LOOP,
+};
+
+extern unsigned long pkvm_sym(loops_per_jiffy);
+
+#endif /* CONFIG_PKVM_X86_HYP_TEST */
+
 #else /* !CONFIG_PKVM_X86 */
 
 static inline bool pkvm_is_protected_vm(struct kvm *kvm) { return false; }
