@@ -5,6 +5,9 @@
 #include <asm/nmi.h>
 #include <kunit/test.h>
 #include "lapic.h"
+#ifdef CONFIG_PKVM_INTEL
+#include "vmx/vmx.h"
+#endif
 
 /* check to see if NMI IPIs work on this machine */
 static DECLARE_BITMAP(nmi_ipi_mask, NR_CPUS);
@@ -283,8 +286,236 @@ static struct kunit_suite pkvm_hyp_mmu = {
 	.test_cases = pkvm_hyp_mmu_test_cases,
 };
 
+#ifdef CONFIG_PKVM_INTEL
+static int test_vmxon(u64 vmxon_pointer)
+{
+	cr4_set_bits(X86_CR4_VMXE);
+
+	asm goto("1: vmxon %[vmxon_pointer]\n\t"
+			  _ASM_EXTABLE(1b, %l[fault])
+			  : : [vmxon_pointer] "m"(vmxon_pointer)
+			  : : fault);
+	return -EIO;
+
+fault:
+	cr4_clear_bits(X86_CR4_VMXE);
+	return 0;
+}
+
+static int test_vmxoff(void)
+{
+	asm goto("1: vmxoff\n\t"
+			  _ASM_EXTABLE(1b, %l[fault])
+			  ::: "cc", "memory" : fault);
+
+	cr4_clear_bits(X86_CR4_VMXE);
+	return -EIO;
+
+fault:
+	cr4_clear_bits(X86_CR4_VMXE);
+	return 0;
+}
+
+static struct vmcs *__alloc_vmcs(gfp_t flags)
+{
+	struct vmcs *vmcs;
+	u64 basic;
+	u32 size;
+
+	rdmsrq(MSR_IA32_VMX_BASIC, basic);
+	size = vmx_basic_vmcs_size(basic);
+
+	vmcs = (struct vmcs *)__get_free_pages(flags, get_order(size));
+	if (!vmcs)
+		return NULL;
+
+	memset(vmcs, 0, size);
+
+	/* KVM supports Enlightened VMCS v1 only */
+	if (kvm_is_using_evmcs())
+		vmcs->hdr.revision_id = KVM_EVMCS_VERSION;
+	else
+		vmcs->hdr.revision_id = vmx_basic_vmcs_revision_id(basic);
+
+	return vmcs;
+}
+
+static void __free_vmcs(struct vmcs *vmcs)
+{
+	free_page((unsigned long)vmcs);
+}
+
+#define vmx_test_asm0(insn)						\
+({									\
+	asm goto("1: " __stringify(insn) "\n\t"				\
+			  _ASM_EXTABLE(1b, %l[fault])			\
+			  : : : "cc" : fault);				\
+	-EIO;								\
+fault:									\
+	0;								\
+})
+
+#define vmx_test_asm1(insn, op1)					\
+({									\
+	asm goto("1: " __stringify(insn) " %0\n\t"			\
+			  _ASM_EXTABLE(1b, %l[fault])			\
+			  : : op1 : "cc" : fault);			\
+	-EIO;								\
+fault:									\
+	0;								\
+})
+
+#define vmx_test_asm2(insn, op1, op2)					\
+({									\
+	asm goto("1: "  __stringify(insn) " %1, %0\n\t"			\
+			  _ASM_EXTABLE(1b, %l[fault])			\
+			  : : op1, op2 : "cc" : fault);			\
+	-EIO;								\
+fault:									\
+	0;								\
+})
+
+static int test_vmwrite(void)
+{
+	return vmx_test_asm2(vmwrite, "r"((u64)HOST_RSP), "r"((unsigned long)0));
+}
+
+static int test_vmread(void)
+{
+	unsigned long value;
+
+	asm goto("1: vmread %1, %0\n\t"
+		 _ASM_EXTABLE(1b, %l[fault])
+		 : "=a"(value) : "r"((u64)HOST_RIP): "cc" : fault);
+
+	return -EIO;
+fault:
+	return 0;
+}
+
+static int test_vmclear(struct vmcs *vmcs)
+{
+	u64 phys_addr = __pa(vmcs);
+
+	return vmx_test_asm1(vmclear, "m"(phys_addr));
+}
+
+static int test_vmptrld(struct vmcs *vmcs)
+{
+	u64 phys_addr = __pa(vmcs);
+
+	return vmx_test_asm1(vmptrld, "m"(phys_addr));
+}
+
+static int test_vmptrst(void)
+{
+	u64 phys_addr = INVALID_PAGE;
+
+	asm goto("1: vmptrst (%0)\n\t"
+		     _ASM_EXTABLE(1b, %l[fault])
+		     :
+		     : "r" (&phys_addr)
+		     : "cc", "memory"
+		     : fault);
+	return -EIO;
+fault:
+	return 0;
+}
+
+static int test_vmlaunch(void)
+{
+	return vmx_test_asm0(vmlaunch);
+}
+
+static int test_vmresume(void)
+{
+	return vmx_test_asm0(vmresume);
+}
+
+static int test_vmfunc(void)
+{
+	return vmx_test_asm0(vmfunc);
+}
+
+static int test_invvpid(void)
+{
+	struct {
+		u64 vpid : 16;
+		u64 rsvd : 48;
+		u64 gva;
+	} operand = { 0, 0, 0 };
+
+	return vmx_test_asm2(invvpid, "r"((u64)VMX_VPID_EXTENT_ALL_CONTEXT), "m"(operand));
+}
+
+static int test_invept(void)
+{
+	struct {
+		u64 eptp;
+		u64 reserved_0;
+	} operand = { 0, 0 };
+
+	return vmx_test_asm2(invept, "r"((u64)VMX_EPT_EXTENT_GLOBAL), "m"(operand));
+}
+
+#endif
+
+static void pkvm_vmx_onoff_test(struct kunit *test)
+{
+#ifndef CONFIG_PKVM_INTEL
+	kunit_skip(test, "pkvm-intel is not enabled for test\n");
+#else
+	int cpu = get_cpu();
+	struct vmcs *vmcs;
+
+	if (!(cpuid_ecx(1) & feature_bit(VMX)) ||
+	    !this_cpu_has(X86_FEATURE_MSR_IA32_FEAT_CTL) ||
+	    !this_cpu_has(X86_FEATURE_VMX)) {
+		kunit_skip(test, "pkvm-vmx: VMX not supported on CPU %d\n", cpu);
+		return;
+	}
+
+	vmcs = __alloc_vmcs(GFP_ATOMIC);
+	KUNIT_ASSERT_NOT_NULL_MSG(test, vmcs, "pkvm_vmx: failed to allocate vmcs for CPU%d\n", cpu);
+
+	KUNIT_EXPECT_EQ_MSG(test, test_vmxon(__pa(vmcs)), 0, "pkvm_vmx: expect vmxon failed\n");
+	/*
+	 * vmxon is failed, so suppose there is no reason to allow vmxoff, as
+	 * well as other vmx instructions. But as the pKVM hypervisor emulates
+	 * these instructions so still need to execute these instructions to
+	 * verify the emulation works as expected.
+	 */
+	KUNIT_EXPECT_EQ_MSG(test, test_vmxoff(), 0, "pkvm_vmx: expect vmxoff failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmwrite(), 0, "pkvm_vmx: expect vmcs_write failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmread(), 0, "pkvm_vmx: expect vmcs_read failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmclear(vmcs), 0, "pkvm_vmx: expect vmcs_clear failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmptrld(vmcs), 0, "pkvm_vmx: expect vmcs_load failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmptrst(), 0, "pkvm_vmx: expect vmcs_store failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmlaunch(), 0, "pkvm_vmx: expect vmcs_launch failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmresume(), 0, "pkvm_vmx: expect vmcs_resume failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_vmfunc(), 0, "pkvm_vmx: expect vmcs_function failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_invvpid(), 0, "pkvm_vmx: expect invvpid failed\n");
+	KUNIT_EXPECT_EQ_MSG(test, test_invept(), 0, "pkvm_vmx: expect invept failed\n");
+
+	__free_vmcs(vmcs);
+
+	put_cpu();
+#endif
+}
+
+static struct kunit_case pkvm_vmx_test_cases[] = {
+	KUNIT_CASE(pkvm_vmx_onoff_test),
+	{}
+};
+
+static struct kunit_suite pkvm_vmx = {
+	.name = "pkvm_vmx",
+	.test_cases = pkvm_vmx_test_cases,
+};
+
 kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize,
-		  &pkvm_reprivilege, &pkvm_fix_exception, &pkvm_hyp_mmu);
+		  &pkvm_reprivilege, &pkvm_fix_exception, &pkvm_hyp_mmu,
+		  &pkvm_vmx);
 
 static int __init pkvm_kunit_test_init(void)
 {
