@@ -876,6 +876,7 @@ enum pkvm_test_fn {
 	NMI_BUSY_LOOP,
 	FIX_EXCEPTION,
 	CHECK_HYP_MMU,
+	SPEC_CTRL,
 };
 
 extern unsigned long pkvm_sym(loops_per_jiffy);

@@ -513,9 +513,48 @@ static struct kunit_suite pkvm_vmx = {
 	.test_cases = pkvm_vmx_test_cases,
 };
 
+static void pkvm_spec_test(struct kunit *test)
+{
+	u64 host_spec, val;
+	int ret;
+
+	if (!boot_cpu_has(X86_FEATURE_MSR_SPEC_CTRL)) {
+		kunit_skip(test, "pkvm-spec: no spec control support\n");
+		return;
+	}
+
+	ret = pkvm_hypercall(test, SPEC_CTRL);
+	if (ret) {
+		kunit_skip(test, "pkvm-spec: spec control is not used by pKVM\n");
+		return;
+	}
+
+	rdmsrq(MSR_IA32_SPEC_CTRL, host_spec);
+	wrmsrq(MSR_IA32_SPEC_CTRL, 0);
+
+	KUNIT_EXPECT_EQ_MSG(test, pkvm_hypercall(test, SPEC_CTRL), 0,
+			"pkvm-spec: spec control test failed\n");
+
+	rdmsrq(MSR_IA32_SPEC_CTRL, val);
+
+	KUNIT_EXPECT_EQ_MSG(test, val, 0, "pkvm-spec: expect host spec_ctrl to be 0\n");
+
+	wrmsrq(MSR_IA32_SPEC_CTRL, host_spec);
+}
+
+static struct kunit_case pkvm_spec_test_cases[] = {
+	KUNIT_CASE(pkvm_spec_test),
+	{}
+};
+
+static struct kunit_suite pkvm_spec = {
+	.name = "pkvm_spec",
+	.test_cases = pkvm_spec_test_cases,
+};
+
 kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize,
 		  &pkvm_reprivilege, &pkvm_fix_exception, &pkvm_hyp_mmu,
-		  &pkvm_vmx);
+		  &pkvm_vmx, &pkvm_spec);
 
 static int __init pkvm_kunit_test_init(void)
 {

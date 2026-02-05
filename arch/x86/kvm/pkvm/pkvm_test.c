@@ -71,6 +71,18 @@ static int pkvm_check_hyp_mmu(unsigned long pkvm_mem_base, unsigned long pkvm_me
 	return 0;
 }
 
+static int pkvm_test_spec_ctrl(void)
+{
+	u64 spec;
+
+	if (!cpu_feature_enabled(X86_FEATURE_MSR_SPEC_CTRL))
+		return 0;
+
+	rdmsrq(MSR_IA32_SPEC_CTRL, spec);
+
+	return (spec == 0) ? -EINVAL : 0;
+}
+
 int pkvm_test(struct kvm_vcpu *hvcpu, union pkvm_hc_data *in,
 	      union pkvm_hc_data *out)
 {
@@ -86,6 +98,9 @@ int pkvm_test(struct kvm_vcpu *hvcpu, union pkvm_hc_data *in,
 		break;
 	case CHECK_HYP_MMU:
 		ret = pkvm_check_hyp_mmu(pkvm_hc_input2(hvcpu), pkvm_hc_input3(hvcpu));
+		break;
+	case SPEC_CTRL:
+		ret = pkvm_test_spec_ctrl();
 		break;
 	default:
 		ret = -EOPNOTSUPP;
