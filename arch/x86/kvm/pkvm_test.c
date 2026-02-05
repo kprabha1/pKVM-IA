@@ -251,8 +251,24 @@ static struct kunit_suite pkvm_reprivilege = {
 	.test_cases = pkvm_reprivilege_test_cases,
 };
 
+static void pkvm_fix_exception_test(struct kunit *test)
+{
+	KUNIT_ASSERT_EQ_MSG(test, pkvm_hypercall(test, FIX_EXCEPTION), 0,
+		"pkvm-fix-exception: failed\n");
+}
+
+static struct kunit_case pkvm_fix_exception_test_cases[] = {
+	KUNIT_CASE(pkvm_fix_exception_test),
+	{}
+};
+
+static struct kunit_suite pkvm_fix_exception = {
+	.name = "pkvm_fix_exception",
+	.test_cases = pkvm_fix_exception_test_cases,
+};
+
 kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize,
-		  &pkvm_reprivilege);
+		  &pkvm_reprivilege, &pkvm_fix_exception);
 
 static int __init pkvm_kunit_test_init(void)
 {
