@@ -4,6 +4,7 @@
 #include <asm/kvm_pkvm.h>
 #include <asm/nmi.h>
 #include <kunit/test.h>
+#include "lapic.h"
 
 /* check to see if NMI IPIs work on this machine */
 static DECLARE_BITMAP(nmi_ipi_mask, NR_CPUS);
@@ -137,7 +138,46 @@ static struct kunit_suite pkvm_msr = {
 	.test_cases = pkvm_msr_test_cases,
 };
 
-kunit_test_suites(&pkvm_nmi, &pkvm_msr);
+static void pkvm_lapic_base_test(struct kunit *test)
+{
+	u64 apic_base;
+
+	KUNIT_ASSERT_EQ_MSG(test, rdmsrq_safe(MSR_IA32_APICBASE, &apic_base),
+			    0, "pkvm-lapic: failed to read apic base\n");
+
+	KUNIT_ASSERT_EQ_MSG(test, (apic_base & LAPIC_MODE_X2APIC), LAPIC_MODE_X2APIC,
+			    "pkvm-lapic: invalid apic base 0x%llx\n", apic_base);
+
+	KUNIT_ASSERT_NE_MSG(test, wrmsrq_safe(MSR_IA32_APICBASE, apic_base & (~LAPIC_MODE_X2APIC)),
+			    0, "pkvm-lapic: expect failure to disable lapic but not\n");
+}
+
+static void pkvm_lapic_id_test(struct kunit *test)
+{
+	u64 apic_id;
+
+	KUNIT_ASSERT_EQ_MSG(test, rdmsrq_safe(X2APIC_MSR(APIC_ID), &apic_id),
+			    0, "pkvm-lapic: failed to read apic id\n");
+
+	KUNIT_ASSERT_NE_MSG(test, wrmsrq_safe(X2APIC_MSR(APIC_ID), apic_id + 1),
+			    0, "pkvm-lapic: expect failure to change apic id but not\n");
+
+	KUNIT_ASSERT_EQ_MSG(test, wrmsrq_safe(X2APIC_MSR(APIC_ID), apic_id),
+			    0, "pkvm-lapic: failed to write apic id with the same value\n");
+}
+
+static struct kunit_case pkvm_lapic_test_cases[] = {
+	KUNIT_CASE(pkvm_lapic_base_test),
+	KUNIT_CASE(pkvm_lapic_id_test),
+	{}
+};
+
+static struct kunit_suite pkvm_lapic = {
+	.name = "pkvm_lapic",
+	.test_cases = pkvm_lapic_test_cases,
+};
+
+kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic);
 
 static int __init pkvm_kunit_test_init(void)
 {
