@@ -267,8 +267,24 @@ static struct kunit_suite pkvm_fix_exception = {
 	.test_cases = pkvm_fix_exception_test_cases,
 };
 
+static void pkvm_check_hyp_mmu(struct kunit *test)
+{
+	KUNIT_ASSERT_EQ_MSG(test, pkvm_hypercall(test, CHECK_HYP_MMU, pkvm_mem_base, pkvm_mem_size),
+			    0, "pkvm-check-hyp-mmu: failed\n");
+}
+
+static struct kunit_case pkvm_hyp_mmu_test_cases[] = {
+	KUNIT_CASE(pkvm_check_hyp_mmu),
+	{}
+};
+
+static struct kunit_suite pkvm_hyp_mmu = {
+	.name = "pkvm_hyp_mmu",
+	.test_cases = pkvm_hyp_mmu_test_cases,
+};
+
 kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize,
-		  &pkvm_reprivilege, &pkvm_fix_exception);
+		  &pkvm_reprivilege, &pkvm_fix_exception, &pkvm_hyp_mmu);
 
 static int __init pkvm_kunit_test_init(void)
 {

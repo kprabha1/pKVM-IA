@@ -820,6 +820,13 @@ void pkvm_hyp_mmu_clone_host(unsigned long start_vaddr)
 }
 #endif
 
+#ifdef CONFIG_PKVM_X86_HYP_TEST
+void pkvm_hyp_mmu_lookup(unsigned long vaddr, unsigned long *phys, u64 *prot, int *level)
+{
+	pkvm_pgtable_lookup(&hyp_mmu, vaddr, phys, prot, level);
+}
+#endif
+
 int pkvm_host_mmu_init(void *pool_base, unsigned long pool_pages,
 		       const struct pkvm_mem_info infos[], int nr_infos,
 		       host_mmu_init_fn_t fn)

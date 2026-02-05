@@ -875,6 +875,7 @@ static inline size_t pkvm_guest_initial_fpstate_size(struct kvm *kvm)
 enum pkvm_test_fn {
 	NMI_BUSY_LOOP,
 	FIX_EXCEPTION,
+	CHECK_HYP_MMU,
 };
 
 extern unsigned long pkvm_sym(loops_per_jiffy);

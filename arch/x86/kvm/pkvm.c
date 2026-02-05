@@ -22,6 +22,8 @@ phys_addr_t pvmfw_base;
 phys_addr_t pvmfw_size;
 
 #if IS_MODULE(CONFIG_PKVM_X86_KUNIT_TEST)
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_mem_base);
+EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_mem_size);
 EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(text_start));
 EXPORT_SYMBOL_FOR_PKVM_INTERNAL(pkvm_sym(text_end));
 #endif /* IS_MODULE(CONFIG_PKVM_X86_KUNIT_TEST) */
