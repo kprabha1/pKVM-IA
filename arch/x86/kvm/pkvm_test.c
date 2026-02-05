@@ -220,7 +220,39 @@ static struct kunit_suite pkvm_init_finalize = {
 	.test_cases = pkvm_init_finalize_test_cases,
 };
 
-kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize);
+static void reprivilege_cpu(void *data)
+{
+	int ret = pkvm_hypercall(reprivilege_cpu);
+
+	if (data)
+		*(int *)data = ret;
+}
+
+static void pkvm_reprivilege_test(struct kunit *test)
+{
+	int cpu, repriv_ret;
+
+	for_each_possible_cpu(cpu) {
+		KUNIT_ASSERT_EQ_MSG(test, smp_call_function_single(cpu, reprivilege_cpu,
+								   &repriv_ret, 1), 0,
+			"pkvm-reprivilege: CPU%d smp-call failed\n", cpu);
+		KUNIT_ASSERT_NE_MSG(test, repriv_ret, 0,
+			"pkvm-reprivilege: expect reprivilege failure on CPU %d\n", cpu);
+	}
+}
+
+static struct kunit_case pkvm_reprivilege_test_cases[] = {
+	KUNIT_CASE(pkvm_reprivilege_test),
+	{}
+};
+
+static struct kunit_suite pkvm_reprivilege = {
+	.name = "pkvm_reprivilege",
+	.test_cases = pkvm_reprivilege_test_cases,
+};
+
+kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize,
+		  &pkvm_reprivilege);
 
 static int __init pkvm_kunit_test_init(void)
 {
