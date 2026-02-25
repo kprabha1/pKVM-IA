@@ -347,32 +347,41 @@ static void __free_vmcs(struct vmcs *vmcs)
 
 #define vmx_test_asm0(insn)						\
 ({									\
+	int ret = -EIO;							\
 	asm goto("1: " __stringify(insn) "\n\t"				\
 			  _ASM_EXTABLE(1b, %l[fault])			\
 			  : : : "cc" : fault);				\
-	-EIO;								\
+	goto done;							\
 fault:									\
-	0;								\
+	ret = 0;							\
+done:									\
+	ret;								\
 })
 
 #define vmx_test_asm1(insn, op1)					\
 ({									\
+	int ret = -EIO;							\
 	asm goto("1: " __stringify(insn) " %0\n\t"			\
 			  _ASM_EXTABLE(1b, %l[fault])			\
 			  : : op1 : "cc" : fault);			\
-	-EIO;								\
+	goto done;							\
 fault:									\
-	0;								\
+	ret = 0;							\
+done:									\
+	ret;								\
 })
 
 #define vmx_test_asm2(insn, op1, op2)					\
 ({									\
+	int ret = -EIO;							\
 	asm goto("1: "  __stringify(insn) " %1, %0\n\t"			\
 			  _ASM_EXTABLE(1b, %l[fault])			\
 			  : : op1, op2 : "cc" : fault);			\
-	-EIO;								\
+	goto done;							\
 fault:									\
-	0;								\
+	ret = 0;							\
+done:									\
+	ret;								\
 })
 
 static int test_vmwrite(void)
