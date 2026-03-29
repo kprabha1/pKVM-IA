@@ -640,8 +640,29 @@ static void pkvm_test_perf_ctrl(struct kunit *test)
 	wrmsrq(MSR_CORE_PERF_GLOBAL_CTRL, msr_val_to_restore);
 }
 
+static void pkvm_test_rtit_ctrl(struct kunit *test)
+{
+	u64 msr_val;
+	u64 msr_val_to_restore;
+
+	rdmsrq(MSR_IA32_RTIT_CTL, msr_val);
+	msr_val_to_restore = msr_val;
+	if (!msr_val) {
+		// Enable bit 0 master trace enable
+		msr_val |= RTIT_CTL_TRACEEN;
+		wrmsrq(MSR_IA32_RTIT_CTL, msr_val);
+	}
+
+	KUNIT_ASSERT_EQ_MSG(test, pkvm_hypercall(test, VM_EXIT_ENTRY_CTRLS,
+			MSR_IA32_RTIT_CTL, msr_val),
+			    0, "pkvm_test_rtit_ctrl: failed\n");
+
+	wrmsrq(MSR_IA32_RTIT_CTL, msr_val_to_restore);
+}
+
 static struct kunit_case pkvm_vm_exit_entry_ctrls_test_cases[] = {
 	KUNIT_CASE(pkvm_test_perf_ctrl),
+	KUNIT_CASE(pkvm_test_rtit_ctrl),
 	{}
 };
 
