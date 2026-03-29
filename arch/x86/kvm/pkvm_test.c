@@ -660,9 +660,35 @@ static void pkvm_test_rtit_ctrl(struct kunit *test)
 	wrmsrq(MSR_IA32_RTIT_CTL, msr_val_to_restore);
 }
 
+static void pkvm_test_lbr_ctrl(struct kunit *test)
+{
+	u64 msr_val;
+	u64 msr_val_to_restore;
+
+	if (!boot_cpu_has(X86_FEATURE_ARCH_LBR)) {
+		kunit_skip(test, "pkvm-lbr: no LBR support\n");
+		return;
+	}
+
+	rdmsrq(MSR_ARCH_LBR_CTL, msr_val);
+	msr_val_to_restore = msr_val;
+	if (!msr_val) {
+		// Enable bit 0 LBR enable
+		msr_val |= ARCH_LBR_CTL_LBREN;
+		wrmsrq(MSR_ARCH_LBR_CTL, msr_val);
+	}
+
+	KUNIT_ASSERT_EQ_MSG(test, pkvm_hypercall(test, VM_EXIT_ENTRY_CTRLS,
+			MSR_ARCH_LBR_CTL, msr_val),
+			    0, "pkvm_test_lbr_ctrl: failed\n");
+
+	wrmsrq(MSR_ARCH_LBR_CTL, msr_val_to_restore);
+}
+
 static struct kunit_case pkvm_vm_exit_entry_ctrls_test_cases[] = {
 	KUNIT_CASE(pkvm_test_perf_ctrl),
 	KUNIT_CASE(pkvm_test_rtit_ctrl),
+	KUNIT_CASE(pkvm_test_lbr_ctrl),
 	{}
 };
 

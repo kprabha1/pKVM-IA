@@ -136,6 +136,31 @@ static int validate_perf_rtit_ctrl(u32 vmexit_ctrls, u32 vmentry_ctrls)
 	return ret;
 }
 
+static int validate_perf_lbr_ctrl(u32 vmexit_ctrls, u32 vmentry_ctrls)
+{
+	int ret = 0;
+	u64 msr_val;
+
+	if (!(vmexit_ctrls & VM_EXIT_CLEAR_IA32_LBR_CTL)) {
+		pr_err("%s: VM_EXIT_CLEAR_IA32_LBR_CTL should be set in VM-Exit controls\n", __func__);
+		ret = -EINVAL;
+	}
+
+	if (!(vmentry_ctrls & VM_ENTRY_LOAD_IA32_LBR_CTL)) {
+		pr_err("%s: VM_ENTRY_LOAD_IA32_LBR_CTL should be set in VM-Entry controls\n", __func__);
+		ret |= -EINVAL;
+	}
+
+	msr_val = vmcs_read64(GUEST_IA32_LBR_CTL);
+	if (msr_val != 0) {
+		pr_err("%s: GUEST_IA32_LBR_CTL is expected to be 0 after vmexit "
+			"to pKVM hypervisor, but got 0x%llx\n", __func__, msr_val);
+		ret |= -EINVAL;
+	}
+
+	return ret;
+}
+
 static int pkvm_test_perf_ctrl(u32 msr_index, u64 msr_val_from_host)
 {
 	u64 msr_val;
@@ -155,6 +180,9 @@ static int pkvm_test_perf_ctrl(u32 msr_index, u64 msr_val_from_host)
 		break;
 	case MSR_IA32_RTIT_CTL:
 		ret |= validate_perf_rtit_ctrl(vmexit_ctrls, vmentry_ctrls);
+		break;
+	case MSR_ARCH_LBR_CTL:
+		ret |= validate_perf_lbr_ctrl(vmexit_ctrls, vmentry_ctrls);
 		break;
 	default:
 		ret = -EINVAL;
