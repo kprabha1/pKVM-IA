@@ -877,6 +877,7 @@ enum pkvm_test_fn {
 	FIX_EXCEPTION,
 	CHECK_HYP_MMU,
 	SPEC_CTRL,
+	VM_EXIT_ENTRY_CTRLS,
 };
 
 extern unsigned long pkvm_sym(loops_per_jiffy);

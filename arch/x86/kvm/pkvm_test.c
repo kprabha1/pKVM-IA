@@ -620,9 +620,39 @@ static struct kunit_suite pkvm_mem = {
 	.test_cases = pkvm_mem_test_cases,
 };
 
+static void pkvm_test_perf_ctrl(struct kunit *test)
+{
+	u64 msr_val;
+	u64 msr_val_to_restore;
+
+	rdmsrq(MSR_CORE_PERF_GLOBAL_CTRL, msr_val);
+	msr_val_to_restore = msr_val;
+	if (!msr_val) {
+		// Enable bit 0 (PMC0) and bits 32-34 (Fixed Counters)
+		msr_val |= 0x0000000700000001ULL;
+		wrmsrq(MSR_CORE_PERF_GLOBAL_CTRL, msr_val);
+	}
+
+	KUNIT_ASSERT_EQ_MSG(test, pkvm_hypercall(test, VM_EXIT_ENTRY_CTRLS,
+			MSR_CORE_PERF_GLOBAL_CTRL, msr_val),
+			    0, "pkvm_test_perf_ctrl: failed\n");
+
+	wrmsrq(MSR_CORE_PERF_GLOBAL_CTRL, msr_val_to_restore);
+}
+
+static struct kunit_case pkvm_vm_exit_entry_ctrls_test_cases[] = {
+	KUNIT_CASE(pkvm_test_perf_ctrl),
+	{}
+};
+
+static struct kunit_suite pkvm_vm_exit_entry_ctrls = {
+	.name = "pkvm_vm_exit_entry_ctrls",
+	.test_cases = pkvm_vm_exit_entry_ctrls_test_cases,
+};
+
 kunit_test_suites(&pkvm_nmi, &pkvm_msr, &pkvm_lapic, &pkvm_init_finalize,
 		  &pkvm_reprivilege, &pkvm_fix_exception, &pkvm_hyp_mmu,
-		  &pkvm_vmx, &pkvm_spec, &pkvm_mem);
+		  &pkvm_vmx, &pkvm_spec, &pkvm_mem, &pkvm_vm_exit_entry_ctrls);
 
 static int __init pkvm_kunit_test_init(void)
 {
