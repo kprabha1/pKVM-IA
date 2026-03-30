@@ -705,11 +705,32 @@ static void pkvm_test_debug_ctrl(struct kunit *test)
 	wrmsrq(MSR_IA32_DEBUGCTLMSR, msr_val_to_restore);
 }
 
+static void pkvm_test_cet_ctrl(struct kunit *test)
+{
+	u64 msr_val;
+	u64 msr_val_to_restore;
+
+	rdmsrq(MSR_IA32_S_CET, msr_val);
+	msr_val_to_restore = msr_val;
+	if (!msr_val) {
+		// Enable bit 5 Suppress IBT disable
+		msr_val |= CET_SUPPRESS_DISABLE;
+		wrmsrq(MSR_IA32_S_CET, msr_val);
+	}
+
+	KUNIT_ASSERT_EQ_MSG(test, pkvm_hypercall(test, VM_EXIT_ENTRY_CTRLS,
+			MSR_IA32_S_CET, msr_val),
+			    0, "pkvm_test_cet_ctrl: failed\n");
+
+	wrmsrq(MSR_IA32_S_CET, msr_val_to_restore);
+}
+
 static struct kunit_case pkvm_vm_exit_entry_ctrls_test_cases[] = {
 	KUNIT_CASE(pkvm_test_perf_ctrl),
 	KUNIT_CASE(pkvm_test_rtit_ctrl),
 	KUNIT_CASE(pkvm_test_lbr_ctrl),
 	KUNIT_CASE(pkvm_test_debug_ctrl),
+	KUNIT_CASE(pkvm_test_cet_ctrl),
 	{}
 };
 

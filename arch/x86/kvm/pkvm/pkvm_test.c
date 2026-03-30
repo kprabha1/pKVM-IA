@@ -178,6 +178,23 @@ static int validate_perf_debug_ctrl(u32 vmexit_ctrls, u32 vmentry_ctrls)
 	return ret;
 }
 
+static int validate_cet_ctrl(u32 vmexit_ctrls, u32 vmentry_ctrls)
+{
+	int ret = 0;
+
+	if (!(vmexit_ctrls & VM_EXIT_LOAD_CET_STATE)) {
+		pr_err("%s: VM_EXIT_LOAD_CET_STATE should be set in VM-Exit controls\n", __func__);
+		ret = -EINVAL;
+	}
+
+	if (!(vmentry_ctrls & VM_ENTRY_LOAD_CET_STATE)) {
+		pr_err("%s: VM_ENTRY_LOAD_CET_STATE should be set in VM-Entry controls\n", __func__);
+		ret |= -EINVAL;
+	}
+
+	return ret;
+}
+
 static int pkvm_test_perf_ctrl(u32 msr_index, u64 msr_val_from_host)
 {
 	u64 msr_val;
@@ -203,6 +220,9 @@ static int pkvm_test_perf_ctrl(u32 msr_index, u64 msr_val_from_host)
 		break;
 	case MSR_IA32_DEBUGCTLMSR:
 		ret |= validate_perf_debug_ctrl(vmexit_ctrls, vmentry_ctrls);
+		break;
+	case MSR_IA32_S_CET:
+		ret |= validate_cet_ctrl(vmexit_ctrls, vmentry_ctrls);
 		break;
 	default:
 		ret = -EINVAL;
