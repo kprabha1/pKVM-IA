@@ -161,6 +161,23 @@ static int validate_perf_lbr_ctrl(u32 vmexit_ctrls, u32 vmentry_ctrls)
 	return ret;
 }
 
+static int validate_perf_debug_ctrl(u32 vmexit_ctrls, u32 vmentry_ctrls)
+{
+	int ret = 0;
+
+	if (!(vmexit_ctrls & VM_EXIT_SAVE_DEBUG_CONTROLS)) {
+		pr_err("%s: VM_EXIT_SAVE_DEBUG_CONTROLS should be set in VM-Exit controls\n", __func__);
+		ret = -EINVAL;
+	}
+
+	if (!(vmentry_ctrls & VM_ENTRY_LOAD_DEBUG_CONTROLS)) {
+		pr_err("%s: VM_ENTRY_LOAD_DEBUG_CONTROLS should be set in VM-Entry controls\n", __func__);
+		ret |= -EINVAL;
+	}
+
+	return ret;
+}
+
 static int pkvm_test_perf_ctrl(u32 msr_index, u64 msr_val_from_host)
 {
 	u64 msr_val;
@@ -183,6 +200,9 @@ static int pkvm_test_perf_ctrl(u32 msr_index, u64 msr_val_from_host)
 		break;
 	case MSR_ARCH_LBR_CTL:
 		ret |= validate_perf_lbr_ctrl(vmexit_ctrls, vmentry_ctrls);
+		break;
+	case MSR_IA32_DEBUGCTLMSR:
+		ret |= validate_perf_debug_ctrl(vmexit_ctrls, vmentry_ctrls);
 		break;
 	default:
 		ret = -EINVAL;
